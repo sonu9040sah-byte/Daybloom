@@ -1,0 +1,17 @@
+{
+  "appId": "com.daybloom.planner",
+  "appName": "Daybloom",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_icon_config_sample",
+      "iconColor": "#5f7cff"
+    }
+  }
+}
