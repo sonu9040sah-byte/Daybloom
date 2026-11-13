@@ -23,18 +23,8 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Copy web app into www
-        run: node scripts/prepare-www.js
-
-      - name: Create Android project
-        run: npx cap add android
-
-      - name: Add notification permissions
-        run: |
-          sed -i 's#</manifest>#    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>\n    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>\n    <uses-permission android:name="android.permission.VIBRATE"/>\n    <uses-permission android:name="android.permission.WAKE_LOCK"/>\n</manifest>#' android/app/src/main/AndroidManifest.xml
-
-      - name: Sync web files into Android project
-        run: npx cap sync android
+      - name: Create and configure the Android project
+        run: node scripts/android-setup.js
 
       - name: Build debug APK
         working-directory: android
