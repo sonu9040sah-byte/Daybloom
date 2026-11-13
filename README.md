@@ -50,6 +50,10 @@ On phones: tap a task to edit, drag the ⠿ grip to move it, drag the bottom edg
 
 See `BUILD_APK.md`. A ready GitHub Actions workflow builds an installable `.apk` for free, with real background reminder notifications.
 
+## Backup, templates and back button
+
+See the "What's new in v1.1" section of `BUILD_APK.md`.
+
 ## Notes
 
 - Opened on a computer, the app shows in a phone-width column, so it also previews fine in VS Code.

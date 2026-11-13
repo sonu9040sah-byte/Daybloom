@@ -46,8 +46,8 @@ function sample() {
   ];
 }
 function load() {
-  try { const x = JSON.parse(localStorage.getItem(KEY)); if (x && x.tasks) { x.settings = Object.assign({ theme: 'system', accent: '#5f7cff', h24: false, mon: true }, x.settings); x.focus = x.focus || {}; x.fired = x.fired || {}; return x; } } catch (e) {}
-  return { tasks: sample(), settings: { theme: 'system', accent: '#5f7cff', h24: false, mon: true }, focus: {}, fired: {} };
+  try { const x = JSON.parse(localStorage.getItem(KEY)); if (x && x.tasks) { x.settings = Object.assign({ theme: 'system', accent: '#5f7cff', h24: false, mon: true }, x.settings); x.focus = x.focus || {}; x.fired = x.fired || {}; x.templates = x.templates || []; return x; } } catch (e) {}
+  return { tasks: sample(), settings: { theme: 'system', accent: '#5f7cff', h24: false, mon: true }, templates: [], focus: {}, fired: {} };
 }
 let S = load();
 let nativeT;
@@ -144,6 +144,7 @@ function renderDrawer() {
       <div class="set-row"><span>Accent</span><div class="swatches">${COLORS.map(c => `<button class="swatch ${s.accent === c ? 'on' : ''}" style="background:${c}" data-act="accent" data-c="${c}" aria-label="Accent ${c}"></button>`).join('')}</div></div>
       <label class="set-row"><span>24-hour clock</span><input type="checkbox" data-set="h24" ${s.h24 ? 'checked' : ''}></label>
       <label class="set-row"><span>Week starts Monday</span><input type="checkbox" data-set="mon" ${s.mon ? 'checked' : ''}></label>
+      <p class="hint">Last backup: ${s.lastBackup || S.lastBackup ? esc(longDate(S.lastBackup)) : 'never — tap Export to save one'}</p>
       <div class="btn-row">
         <button data-act="notif">🔔 Notifications</button>
         ${LN() ? '' : '<button data-act="install">📲 Install app</button>'}
@@ -187,12 +188,14 @@ function renderStrip() {
 
 function blockHTML(i, lane, lanes, n) {
   const t = i.t, start = toMin(t.time), dur = t.dur || 30;
-  const subs = t.subtasks.length ? ` · ${t.subtasks.filter(s => s.done).length}/${t.subtasks.length}` : '';
+  const sn = t.subtasks.length, sd = t.subtasks.filter(s => s.done).length;
+  const subs = sn ? ` · ☑ ${sd}/${sn}` : '';
+  const note = t.notes && t.notes.trim() ? ' · 📝' : '';
   const w = 100 / lanes;
   const hpx = Math.max(dur * PPM, 34) - 2;
   return `<div class="blk ${i.done ? 'done' : ''} ${hpx < 56 ? 'short' : ''}" data-id="${t.id}" style="--i:${n};--c:${t.color};top:${start * PPM}px;height:${hpx}px;left:calc(${lane * w}% + 6px);width:calc(${w}% - 12px)">
     <button class="chk ${i.done ? 'done' : ''}" data-act="toggle" data-id="${t.id}" data-day="${i.day}" aria-label="Complete"></button>
-    <div class="bt"><b>${esc(t.icon)} ${esc(t.title)}</b><small>${fmt(t.time)} – ${fmt(fromMin(start + dur))} · ${fmtDur(dur)}${subs}${t.repeat !== 'none' ? ' · 🔁' : ''}</small></div>
+    <div class="bt"><b>${esc(t.icon)} ${esc(t.title)}</b><small>${fmt(t.time)} – ${fmt(fromMin(start + dur))} · ${fmtDur(dur)}${subs}${note}${t.repeat !== 'none' ? ' · 🔁' : ''}</small>${sn ? `<i class="sp" style="--v:${sd / sn * 100}%"></i>` : ''}</div>
     <div class="grip" aria-label="Drag to move">⠿</div><div class="rs"></div></div>`;
 }
 function layout(timed) {
@@ -216,7 +219,7 @@ function renderDay() {
     h += `<div class="tray"><h4>Anytime</h4>${untimed.map((i, k) => `
       <div class="row ${i.done ? 'done' : ''}" style="--i:${k};--c:${i.t.color}" data-act="edit" data-id="${i.t.id}">
         <button class="chk ${i.done ? 'done' : ''}" data-act="toggle" data-id="${i.t.id}" data-day="${i.day}"></button>
-        <span class="ic">${esc(i.t.icon)}</span><span class="t">${esc(i.t.title)}</span></div>`).join('')}</div>`;
+        <span class="ic">${esc(i.t.icon)}</span><span class="t">${esc(i.t.title)}${i.t.subtasks.length ? `<em class="meta">☑ ${i.t.subtasks.filter(x => x.done).length}/${i.t.subtasks.length}</em>` : ''}${i.t.notes && i.t.notes.trim() ? '<em class="meta">📝</em>' : ''}</span></div>`).join('')}</div>`;
   }
   let hours = '';
   for (let hr = 0; hr < 24; hr++) hours += `<div class="hr" style="top:${hr * PPH}px"><span>${fmtHour(hr)}</span></div>`;
@@ -290,6 +293,7 @@ function openEditor(id, pre) {
   const card = $('#modalCard');
   card.innerHTML = `
     <div class="grab"></div><h2>${isNew ? 'New task' : 'Edit task'}</h2>
+    ${isNew && S.templates.length ? `<div class="field"><label>Templates</label><div class="tpls">${S.templates.map(tp => `<span class="tpl"><button data-tpl="${tp.id}">${esc(tp.icon)} ${esc(tp.name)}</button><button class="x" data-tpldel="${tp.id}" aria-label="Delete template">✕</button></span>`).join('')}</div></div>` : ''}
     <div class="field"><label>Title</label><input id="eTitle" value="${esc(t.title)}" placeholder="What do you want to do?"></div>
     <div class="field"><label>Icon</label><div class="opts" id="eIcons">${ICONS.map(i => `<button data-v="${i}" class="${t.icon === i ? 'on' : ''}">${i}</button>`).join('')}</div></div>
     <div class="field"><label>Color</label><div class="opts" id="eColors">${COLORS.map(c => `<button class="col ${t.color === c ? 'on' : ''}" data-v="${c}" style="background:${c}"></button>`).join('')}</div></div>
@@ -304,6 +308,7 @@ function openEditor(id, pre) {
     <div class="field"><label>Notes</label><textarea id="eNotes" rows="3">${esc(t.notes)}</textarea></div>
     <div class="foot">
       ${isNew ? '' : '<button class="danger" id="eDel">Delete</button><button id="eDup">Duplicate</button><button id="eFocus">⏱ Focus</button>'}
+      <button id="eTpl">★ Template</button>
       <button id="eCancel">Cancel</button><button class="primary" id="eSave">Save</button>
     </div>`;
   const drawSubs = () => {
@@ -312,6 +317,15 @@ function openEditor(id, pre) {
   drawSubs();
   card.onclick = e => {
     const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.tpl) {
+      const tp = S.templates.find(x => x.id === b.dataset.tpl); if (!tp) return;
+      openEditor(null, { title: tp.title, icon: tp.icon, color: tp.color, time: tp.time, dur: tp.dur, notes: tp.notes, repeat: tp.repeat, remind: tp.remind, date: $('#eDate', card).value || null, subtasks: tp.subtasks.map(x => ({ id: uid(), t: x.t, done: false })) });
+      buzz(8); return;
+    }
+    if (b.dataset.tpldel) {
+      if (confirm('Delete this template?')) { S.templates = S.templates.filter(x => x.id !== b.dataset.tpldel); save(); openEditor(null, { date: $('#eDate', card).value || null }); }
+      return;
+    }
     if (b.parentElement.id === 'eIcons') { t.icon = b.dataset.v; $$('#eIcons button', card).forEach(x => x.classList.toggle('on', x === b)); }
     else if (b.parentElement.id === 'eColors') { t.color = b.dataset.v; $$('#eColors button', card).forEach(x => x.classList.toggle('on', x === b)); }
     else if (b.dataset.x !== undefined) { subs.splice(+b.dataset.x, 1); drawSubs(); }
@@ -324,6 +338,13 @@ function openEditor(id, pre) {
     if (e.key === 'Enter' && e.target.value.trim()) { e.preventDefault(); subs.push({ id: uid(), t: e.target.value.trim(), done: false }); e.target.value = ''; drawSubs(); }
   };
   $('#eCancel', card).onclick = closeModal;
+  $('#eTpl', card).onclick = () => {
+    const title = $('#eTitle', card).value.trim();
+    if (!title) { $('#eTitle', card).focus(); toast('Give the task a title first'); return; }
+    const tp = { id: uid(), name: title, title, icon: t.icon, color: t.color, time: $('#eTime', card).value || null, dur: Math.max(5, parseInt($('#eDur', card).value) || 30), notes: $('#eNotes', card).value, repeat: $('#eRepeat', card).value, remind: $('#eRemind', card).value === '' ? null : +$('#eRemind', card).value, subtasks: subs.filter(x => x.t.trim()).map(x => ({ id: uid(), t: x.t, done: false })) };
+    S.templates = S.templates.filter(x => x.name.toLowerCase() !== title.toLowerCase()).concat(tp);
+    save(); buzz(12); toast('Saved as a template ★ — find it under New task');
+  };
   $('#eSave', card).onclick = () => {
     const title = $('#eTitle', card).value.trim();
     if (!title) { $('#eTitle', card).focus(); return; }
@@ -444,12 +465,9 @@ document.addEventListener('click', e => {
       if (!('Notification' in window)) { toast('Notifications are not supported in this browser (in-app reminders still work)'); break; }
       Notification.requestPermission().then(p => toast(p === 'granted' ? 'Notifications enabled ✅' : 'Permission not granted — in-app reminders will still appear'));
       break;
-    case 'export': {
-      const blob = new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' });
-      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `daybloom-backup-${todayStr()}.json`; a.click(); URL.revokeObjectURL(a.href); break;
-    }
+    case 'export': exportBackup(); break;
     case 'import': $('#importFile').click(); break;
-    case 'reset': if (confirm('Reset everything to the sample data? This deletes all your tasks.')) { S = { tasks: sample(), settings: S.settings, focus: {}, fired: {} }; save(); render(); } break;
+    case 'reset': if (confirm('Reset everything to the sample data? This deletes all your tasks.')) { S = { tasks: sample(), settings: S.settings, templates: S.templates || [], lastBackup: S.lastBackup, focus: {}, fired: {} }; save(); render(); } break;
   }
 });
 document.addEventListener('change', e => {
@@ -459,7 +477,7 @@ document.addEventListener('change', e => {
 $('#importFile').onchange = e => {
   const f = e.target.files[0]; if (!f) return;
   const r = new FileReader();
-  r.onload = () => { try { const x = JSON.parse(r.result); if (!Array.isArray(x.tasks)) throw 0; S = Object.assign({ settings: S.settings, focus: {}, fired: {} }, x); save(); render(); toast('Backup imported'); } catch (err) { toast('Invalid backup file'); } };
+  r.onload = () => { try { const x = JSON.parse(r.result); if (!Array.isArray(x.tasks)) throw 0; S = Object.assign({ settings: S.settings, focus: {}, fired: {}, templates: [] }, x); S.templates = S.templates || []; S.focus = S.focus || {}; S.fired = S.fired || {}; save(); render(); toast('Backup imported'); } catch (err) { toast('Invalid backup file'); } };
   r.readAsText(f); e.target.value = '';
 };
 const canDismiss = el => Date.now() - (el._at || 0) > 500; // ignore the ghost mouse event that follows a tap
@@ -528,9 +546,29 @@ viewEl.addEventListener('pointerdown', e => {
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (S.settings.theme === 'system') applyTheme(); });
 
 /* ---------- native Android reminders (Capacitor Local Notifications) ---------- */
-function LN() {
+function plug(name) {
   const c = window.Capacitor;
-  return (c && c.isNativePlatform && c.isNativePlatform() && c.Plugins && c.Plugins.LocalNotifications) || null;
+  return (c && c.isNativePlatform && c.isNativePlatform() && c.Plugins && c.Plugins[name]) || null;
+}
+const LN = () => plug('LocalNotifications');
+
+/* backup: share sheet in the APK (save to Drive, WhatsApp, email...), file download in a browser */
+async function exportBackup() {
+  const json = JSON.stringify(S, null, 2), name = `daybloom-backup-${todayStr()}.json`;
+  const fsP = plug('Filesystem'), shP = plug('Share');
+  try {
+    if (fsP && shP) {
+      const r = await fsP.writeFile({ path: name, data: json, directory: 'CACHE', encoding: 'utf8' });
+      await shP.share({ title: 'Daybloom backup', text: 'Daybloom backup ' + todayStr(), files: [r.uri], dialogTitle: 'Save your backup to Drive or send it to yourself' });
+    } else {
+      const blob = new Blob([json], { type: 'application/json' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); URL.revokeObjectURL(a.href);
+    }
+    S.lastBackup = todayStr(); save(); if (drawerMode === 'settings') renderDrawer();
+    toast('Backup ready ✅');
+  } catch (e) {
+    if (!/cancel/i.test(String((e && e.message) || e))) toast('Backup failed. Try again.');
+  }
 }
 function hashId(str) { let h = 7; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0; return Math.abs(h) % 2147483000 + 1; }
 const CHANNEL = { id: 'reminders', name: 'Task reminders', description: 'Reminders before your tasks start', importance: 4, visibility: 1, vibration: true };
@@ -602,6 +640,19 @@ window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferr
 render();
 tick();
 if (LN()) { LN().createChannel(CHANNEL).catch(() => {}); scheduleNative(); }
+
+/* Android back button: close the top sheet, then go back to Day, then to Today, then exit */
+const AppP = plug('App');
+if (AppP && AppP.addListener) {
+  AppP.addListener('backButton', () => {
+    if ($('#focus').classList.contains('open')) { $('#fClose').click(); return; }
+    if ($('#modal').classList.contains('open')) { closeModal(); return; }
+    if ($('#drawer').classList.contains('open')) { closeDrawer(); return; }
+    if (view !== 'day') { view = 'day'; navDir = 0; animate = true; needScroll = true; render(); return; }
+    if (cur !== todayStr()) { navDir = todayStr() > cur ? 1 : -1; cur = todayStr(); monthCur = cur.slice(0, 8) + '01'; needScroll = true; animate = true; render(); return; }
+    if (AppP.exitApp) AppP.exitApp(); else if (AppP.minimizeApp) AppP.minimizeApp();
+  });
+}
 
 /* PWA: offline support + installable on Android (needs https or localhost) */
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {

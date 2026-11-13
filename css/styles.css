@@ -227,3 +227,15 @@ h1{margin:0;font-size:30px;letter-spacing:-.03em;font-weight:800}
 
 /* keep Save / Cancel reachable in long sheets */
 .foot{position:sticky;bottom:calc(-24px - var(--sb));background:linear-gradient(to top,var(--panel) 75%,transparent);padding:14px 0 calc(14px + var(--sb));margin-bottom:calc(-24px - var(--sb))}
+
+/* subtask progress, notes marker, templates */
+.sp{display:block;height:4px;border-radius:2px;background:color-mix(in srgb,var(--c) 22%,transparent);margin-top:5px;position:relative;overflow:hidden}
+.sp::after{content:"";position:absolute;left:0;top:0;bottom:0;width:var(--v);background:var(--c);border-radius:2px;transition:width .5s var(--ease)}
+.blk.short .sp{display:none}
+.meta{font-style:normal;font-size:11px;font-weight:700;color:var(--muted);margin-left:8px}
+.tpls{display:flex;flex-wrap:wrap;gap:8px}
+.tpl{display:inline-flex;align-items:center;background:var(--bg);border-radius:12px;border:1.5px solid var(--line)}
+.tpl button{padding:8px 4px 8px 12px;font-weight:600;font-size:14px}
+.tpl button.x{padding:8px 10px 8px 4px;color:var(--muted);width:auto}
+.sub input[type=checkbox]:checked + input[type=text]{text-decoration:line-through;color:var(--muted)}
+.sub input[type=checkbox]{accent-color:var(--accent);width:22px!important;height:22px;flex:none}

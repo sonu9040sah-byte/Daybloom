@@ -18,6 +18,21 @@ If the build fails, open the failed step in Actions and share the red error text
 2. Go to pwabuilder.com, paste your site link, and choose **Package for stores > Android**.
 3. Download the package and install the APK it contains.
 
+## Updating an app you already built (v1.1 and later)
+
+1. Open your GitHub repo, click **Add file > Upload files**, and drag in everything from the new `daybloom` folder (contents, not the folder). GitHub replaces files with the same name. This adds the new `android-res` and `scripts` folders.
+2. The build recipe changed, so open `.github/workflows/build-apk.yml` in the repo, click the pencil icon, replace all of its text with the same file from this folder, and click **Commit changes**.
+3. Open **Actions**, wait for the new build (or click **Run workflow**), and download `daybloom-apk` again.
+4. Install the new APK over the old one. Your tasks are kept, because it is the same app.
+
+## What's new in v1.1
+
+- Android back button: closes the open sheet first, then returns to Day, then to Today, then exits.
+- New flower app icon and notification icon.
+- Export now opens the Android share sheet, so you can save the backup to Google Drive, WhatsApp or email. Import reads it back. Settings shows the date of your last backup.
+- Task templates: in the task form tap **Template** to save the current task, and tap a template chip in a new task to reuse it.
+- Subtask progress bar and a notes marker on timeline tasks.
+
 ## Good to know
 
 - This is a debug-signed APK. It is fine for installing on your own phone but not for uploading to the Play Store.
