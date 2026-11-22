@@ -3,7 +3,7 @@
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const KEY = 'daybloom.v1';
-const VERSION = '1.2.0';
+const VERSION = '1.3.0';
 const PPH = 64, PPM = PPH / 60;
 const COLORS = ['#ff6b6b','#ff9f43','#feca57','#1dd1a1','#48dbfb','#5f7cff','#a55eea','#ff78b5','#8395a7'];
 const ICONS = ['📝','💼','🏃','📚','🍽️','🛒','🧘','💡','📞','✈️','🎯','🛌','💻','🎵','🧹','💊'];
@@ -110,6 +110,8 @@ function fmt(t) {
 }
 const fmtHour = h => S.settings.h24 ? `${pad(h)}:00` : (h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`);
 const fmtDur = m => m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? ' ' + (m % 60) + 'm' : ''}` : `${m}m`;
+// compact clock for 30-minute blocks, where "7:00 AM" is too wide to share a line with the title
+const shortTime = t => { if (!t) return ''; if (S.settings.h24) return t; const [h, m] = t.split(':').map(Number); return `${h % 12 || 12}:${pad(m)}`; };
 const longDate = s => parse(s).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
 
 /* ---------- theme ---------- */
@@ -151,9 +153,10 @@ function renderDrawer() {
   $$('[data-act="view"]').forEach(b => b.classList.toggle('active', b.dataset.v === view));
   if (!drawerMode) return;
   let h = '<div class="grab"></div>';
+  const head = title => `<div class="sheet-head"><h2>${title}</h2><button class="sheet-x" data-act="closeDrawer" aria-label="Close">✕</button></div>`;
   if (drawerMode === 'inbox') {
     const inbox = S.tasks.filter(t => !t.date);
-    h += `<h2>Inbox</h2><p class="hint">Ideas and to-dos without a date. Tap 📅 to put one on ${esc(longDate(cur))}.</p>
+    h += head('Inbox') + `<p class="hint">Ideas and to-dos without a date. Tap the calendar button to put one on ${esc(longDate(cur))}.</p>
       <ul id="inboxList">${inbox.length ? inbox.map((t, k) => `
         <li class="${t.done.inbox ? 'done' : ''}" style="--i:${k};--c:${t.color}">
           <button class="chk ${t.done.inbox ? 'done' : ''}" data-act="toggle" data-id="${t.id}" data-day="inbox" aria-label="Complete"></button>
@@ -163,21 +166,28 @@ function renderDrawer() {
       <button class="primary wide" data-act="inboxAdd">+ Add to inbox</button>`;
   } else {
     const s = S.settings;
-    h += `<h2>Settings</h2>
-      <div class="set-row"><span>Theme</span>
-        <select data-set="theme">${['system', 'light', 'dark'].map(v => `<option ${s.theme === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
-      <div class="set-row"><span>Accent</span><div class="swatches">${COLORS.map(c => `<button class="swatch ${s.accent === c ? 'on' : ''}" style="background:${c}" data-act="accent" data-c="${c}" aria-label="Accent ${c}"></button>`).join('')}</div></div>
-      <label class="set-row"><span>24-hour clock</span><input type="checkbox" data-set="h24" ${s.h24 ? 'checked' : ''}></label>
-      <label class="set-row"><span>Week starts Monday</span><input type="checkbox" data-set="mon" ${s.mon ? 'checked' : ''}></label>
-      <p class="hint">Last backup: ${s.lastBackup || S.lastBackup ? esc(longDate(S.lastBackup)) : 'never — tap Export to save one'}</p>
-      <p class="hint ver">Daybloom ${VERSION} · data stays on this device</p>
-      <div class="btn-row">
-        <button data-act="notif">🔔 Notifications</button>
-        ${LN() ? '' : '<button data-act="install">📲 Install app</button>'}
-        <button data-act="export">⬇️ Export</button>
-        <button data-act="import">⬆️ Import</button>
-        <button data-act="reset" style="grid-column:1/-1">♻️ Reset to sample data</button>
-      </div>`;
+    h += head('Settings');
+    h += `<p class="sec-label">Appearance</p>
+      <div class="set-group">
+        <div class="set-row"><span>Theme</span>
+          <select data-set="theme">${['system', 'light', 'dark'].map(v => `<option value="${v}" ${s.theme === v ? 'selected' : ''}>${v[0].toUpperCase() + v.slice(1)}</option>`).join('')}</select></div>
+        <div class="set-row"><span>Accent</span><div class="swatches">${COLORS.map(c => `<button class="swatch ${s.accent === c ? 'on' : ''}" style="background:${c}" data-act="accent" data-c="${c}" aria-label="Accent ${c}"></button>`).join('')}</div></div>
+        <label class="set-row"><span>24-hour clock</span><input type="checkbox" data-set="h24" ${s.h24 ? 'checked' : ''}></label>
+        <label class="set-row"><span>Week starts Monday</span><input type="checkbox" data-set="mon" ${s.mon ? 'checked' : ''}></label>
+      </div>
+      <p class="sec-label">Data</p>
+      <div class="set-group">
+        <button class="set-link" data-act="export">Export backup</button>
+        <button class="set-link" data-act="import">Import backup</button>
+        <button class="set-link danger" data-act="reset">Reset to sample data</button>
+      </div>
+      <p class="sec-label">Device</p>
+      <div class="set-group">
+        <button class="set-link" data-act="notif">Notifications</button>
+        ${LN() ? '' : '<button class="set-link" data-act="install">Install app</button>'}
+      </div>
+      <p class="hint" style="margin-top:14px">Last backup: ${s.lastBackup || S.lastBackup ? esc(longDate(S.lastBackup)) : 'never — export one to keep your data safe'}</p>
+      <p class="hint ver">Daybloom ${VERSION} · data stays on this device</p>`;
   }
   $('#drawerCard').innerHTML = h;
 }
@@ -195,6 +205,8 @@ function renderHeader() {
   $('#progress i').style.width = pct + '%';
   $('#progress').style.visibility = view === 'day' ? 'visible' : 'hidden';
   $('#todayBtn').style.display = (view === 'day' && cur !== today) ? '' : 'none';
+  // the Insights charts run to the right edge, so the add button would sit on top of them
+  $('#fab').style.display = view === 'insights' ? 'none' : '';
   $('#weekStrip').style.display = view === 'day' ? '' : 'none';
 }
 function renderStrip() {
@@ -219,9 +231,13 @@ function blockHTML(i, lane, lanes, n) {
   const note = t.notes && t.notes.trim() ? ' · 📝' : '';
   const w = 100 / lanes;
   const hpx = Math.max(dur * PPM, 34) - 2;
+  // only the shortest blocks use one-line layout; they get a compact start time
+  const when = hpx < 40
+    ? shortTime(t.time)
+    : `${fmt(t.time)} – ${fmt(fromMin(start + dur))} · ${fmtDur(dur)}${subs}${note}${t.repeat !== 'none' ? ' · 🔁' : ''}`;
   return `<div class="blk ${i.done ? 'done' : ''} ${hpx < 56 ? 'short' : ''}" data-id="${t.id}" style="--i:${n};--c:${t.color};top:${start * PPM}px;height:${hpx}px;left:calc(${lane * w}% + 6px);width:calc(${w}% - 12px)">
     <button class="chk ${i.done ? 'done' : ''}" data-act="toggle" data-id="${t.id}" data-day="${i.day}" aria-label="Complete"></button>
-    <div class="bt"><b>${esc(t.icon)} ${esc(t.title)}</b><small>${fmt(t.time)} – ${fmt(fromMin(start + dur))} · ${fmtDur(dur)}${subs}${note}${t.repeat !== 'none' ? ' · 🔁' : ''}</small>${sn ? `<i class="sp" style="--v:${sd / sn * 100}%"></i>` : ''}</div>
+    <div class="bt"><b>${esc(t.icon)} ${esc(t.title)}</b><small>${when}</small>${sn ? `<i class="sp" style="--v:${sd / sn * 100}%"></i>` : ''}</div>
     <div class="grip" aria-label="Drag to move">⠿</div><div class="rs"></div></div>`;
 }
 function layout(timed) {
@@ -255,7 +271,7 @@ function renderDay() {
     stage();
     return;
   }
-  h += `<div class="timeline" id="grid">${hours}${layout(timed)}${cur === todayStr() ? '<div class="now" id="nowLine"></div>' : ''}</div>`;
+  h += `<div class="timeline" id="grid">${hours}${layout(timed)}${cur === todayStr() ? '<div class="now" id="nowLine"><span id="nowTime"></span></div>' : ''}</div>`;
   $('#view').innerHTML = h;
   stage();
   updateNow();
@@ -269,7 +285,8 @@ function renderDay() {
 }
 function updateNow() {
   const el = $('#nowLine'); if (!el) return;
-  const n = new Date(); el.style.top = (n.getHours() * 60 + n.getMinutes()) * PPM + 'px';
+  const n = new Date(), m = n.getHours() * 60 + n.getMinutes(); el.style.top = m * PPM + 'px';
+  const label = $('#nowTime'); if (label) label.textContent = fmt(fromMin(m));
 }
 function renderMonth() {
   const first = parse(monthCur), mon = S.settings.mon;
@@ -286,6 +303,7 @@ function renderMonth() {
   }
   $('#view').innerHTML = h + '</div>';
   stage();
+  $('#view').scrollTop = 0; // a view switch shouldn't inherit the previous view's scroll offset
 }
 function renderInsights() {
   const days = [], today = todayStr();
@@ -314,6 +332,7 @@ function renderInsights() {
       <span>${parse(s.day).toLocaleDateString(undefined, { weekday: 'short' })}</span></div>`).join('')}</div>`;
   stage();
   countUp();
+  $('#view').scrollTop = 0;
 }
 
 /* ---------- editor ---------- */
@@ -324,7 +343,8 @@ function openEditor(id, pre) {
   let subs = t.subtasks.slice();
   const card = $('#modalCard');
   card.innerHTML = `
-    <div class="grab"></div><h2>${isNew ? 'New task' : 'Edit task'}</h2>
+    <div class="grab"></div>
+    <div class="sheet-head"><h2>${isNew ? 'New task' : 'Edit task'}</h2><button class="sheet-x" id="eCloseX" aria-label="Close">✕</button></div>
     ${isNew && S.templates.length ? `<div class="field"><label>Templates</label><div class="tpls">${S.templates.map(tp => `<span class="tpl"><button data-tpl="${tp.id}">${esc(tp.icon)} ${esc(tp.name)}</button><button class="x" data-tpldel="${tp.id}" aria-label="Delete template">✕</button></span>`).join('')}</div></div>` : ''}
     <div class="field"><label>Title</label><input id="eTitle" value="${esc(t.title)}" placeholder="What do you want to do?"></div>
     <div class="field"><label>Icon</label><div class="opts" id="eIcons">${ICONS.map(i => `<button data-v="${i}" class="${t.icon === i ? 'on' : ''}">${i}</button>`).join('')}</div></div>
@@ -339,9 +359,11 @@ function openEditor(id, pre) {
     <div class="field"><label>Subtasks</label><div id="eSubs"></div><div class="sub"><input type="text" id="eSubNew" placeholder="Add a subtask and press Enter"></div></div>
     <div class="field"><label>Notes</label><textarea id="eNotes" rows="3">${esc(t.notes)}</textarea></div>
     <div class="foot">
-      ${isNew ? '' : '<button class="danger" id="eDel">Delete</button><button id="eDup">Duplicate</button><button id="eFocus">⏱ Focus</button>'}
-      <button id="eTpl">★ Template</button>
-      <button id="eCancel">Cancel</button><button class="primary" id="eSave">Save</button>
+      ${isNew ? '' : `<div class="foot-sec"><button class="danger" id="eDel">Delete</button><button id="eDup">Copy</button><button id="eFocus">Focus</button><button id="eTpl">Template</button></div>`}
+      <div class="foot-main">
+        ${isNew ? '<button id="eTpl">Save as template</button>' : ''}
+        <button id="eCancel">Cancel</button><button class="primary" id="eSave">Save</button>
+      </div>
     </div>`;
   const drawSubs = () => {
     $('#eSubs', card).innerHTML = subs.map((s, i) => `<div class="sub"><input type="checkbox" data-i="${i}" ${s.done ? 'checked' : ''} style="width:auto"><input type="text" data-t="${i}" value="${esc(s.t)}"><button class="x" data-x="${i}">✕</button></div>`).join('');
@@ -404,6 +426,7 @@ function openEditor(id, pre) {
     $('#eDup', card).onclick = () => { const c = JSON.parse(JSON.stringify(byId(t.id))); c.id = uid(); c.title += ' (copy)'; c.done = {}; S.tasks.push(c); save(); closeModal(); render(); toast('Duplicated'); };
     $('#eFocus', card).onclick = () => { closeModal(); openFocus(t.id); };
   }
+  $('#eCloseX', card).onclick = closeModal;
   showSheet($('#modal'));
   if (isNew) setTimeout(() => $('#eTitle', card).focus(), 380);
 }
@@ -479,6 +502,7 @@ document.addEventListener('click', e => {
       }
       setTimeout(render, 420); break;
     }
+    case 'closeDrawer': closeDrawer(); break;
     case 'edit': closeDrawer(); openEditor(id); break;
     case 'goto': { const nd = el.dataset.day; navDir = nd > cur ? 1 : nd < cur ? -1 : 0; cur = nd; monthCur = cur.slice(0, 8) + '01'; if (el.dataset.open) { view = 'day'; navDir = 0; needScroll = true; } animate = true; buzz(6); render(); break; }
     case 'view': if (view === el.dataset.v) break; view = el.dataset.v; needScroll = true; navDir = 0; animate = true; if (view === 'month') monthCur = cur.slice(0, 8) + '01'; buzz(6); render(); break;

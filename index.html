@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#5f7cff">
+  <meta name="color-scheme" content="light dark">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="manifest" href="manifest.json">
@@ -21,7 +22,7 @@
     </div>
     <div class="nav-btns">
       <button class="pill" id="todayBtn" data-act="today">Today</button>
-      <button class="icon" data-act="settings" aria-label="Settings">⚙️</button>
+      <button class="icon" data-act="settings" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
     </div>
   </header>
   <div id="progress"><i></i></div>
@@ -29,12 +30,12 @@
   <div id="view"></div>
 
   <nav id="tabbar">
-    <button data-act="view" data-v="day"><span>🗓️</span>Day</button>
-    <button data-act="view" data-v="month"><span>📅</span>Calendar</button>
-    <button data-act="view" data-v="insights"><span>📊</span>Insights</button>
-    <button data-act="menu"><span>📥</span>Inbox</button>
+    <button data-act="view" data-v="day"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16" rx="4"/><path d="M3 9.5h18"/><path d="M8 2.5v4M16 2.5v4"/><rect x="7.5" y="12.5" width="4" height="4" rx="1.2" fill="currentColor" stroke="none"/></svg>Day</button>
+    <button data-act="view" data-v="month"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/></svg>Calendar</button>
+    <button data-act="view" data-v="insights"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V13M10 20V6M16 20v-9M22 20H2"/></svg>Insights</button>
+    <button data-act="menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13.5 6.2 5.6A2 2 0 0 1 8.1 4h7.8a2 2 0 0 1 1.9 1.6L20 13.5"/><path d="M4 13.5h4.2l1.3 2.4h5l1.3-2.4H20v4.6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/></svg>Inbox</button>
   </nav>
-  <button id="fab" data-act="add" aria-label="Add task">+</button>
+  <button id="fab" data-act="add" aria-label="Add task"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5.5v13M5.5 12h13"/></svg></button>
 </div>
 
 <div id="modal" class="overlay" hidden><div class="card" id="modalCard"></div></div>
