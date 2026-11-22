@@ -3,6 +3,7 @@
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const KEY = 'daybloom.v1';
+const VERSION = '1.2.0';
 const PPH = 64, PPM = PPH / 60;
 const COLORS = ['#ff6b6b','#ff9f43','#feca57','#1dd1a1','#48dbfb','#5f7cff','#a55eea','#ff78b5','#8395a7'];
 const ICONS = ['📝','💼','🏃','📚','🍽️','🛒','🧘','💡','📞','✈️','🎯','🛌','💻','🎵','🧹','💊'];
@@ -55,6 +56,30 @@ const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch
 let view = 'day', cur = todayStr(), monthCur = cur.slice(0, 8) + '01', needScroll = true;
 let animate = true, navDir = 0, drawerMode = null, deferredInstall = null;
 const byId = id => S.tasks.find(t => t.id === id);
+
+/* ---------- imported data ---------- */
+// Backups from older versions (or hand-edited files) may be missing fields. Fill them in,
+// otherwise occursOn() skips tasks with an unknown repeat and the import looks like it failed.
+function normalizeTask(t) {
+  t = t && typeof t === 'object' ? t : {};
+  return {
+    id: typeof t.id === 'string' && t.id ? t.id : uid(),
+    title: typeof t.title === 'string' && t.title.trim() ? t.title : 'Untitled',
+    icon: typeof t.icon === 'string' && t.icon ? t.icon : '📝',
+    color: COLORS.includes(t.color) ? t.color : COLORS[5],
+    date: typeof t.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t.date) ? t.date : null,
+    time: typeof t.time === 'string' && /^\d{1,2}:\d{2}$/.test(t.time) ? t.time : null,
+    dur: Math.max(5, parseInt(t.dur, 10) || 30),
+    notes: typeof t.notes === 'string' ? t.notes : '',
+    subtasks: Array.isArray(t.subtasks)
+      ? t.subtasks.filter(s => s && typeof s.t === 'string').map(s => ({ id: s.id || uid(), t: s.t, done: !!s.done }))
+      : [],
+    repeat: REPEATS.some(([v]) => v === t.repeat) ? t.repeat : 'none',
+    remind: t.remind == null || t.remind === '' || isNaN(+t.remind) ? null : +t.remind,
+    done: t.done && typeof t.done === 'object' ? t.done : {},
+    skip: Array.isArray(t.skip) ? t.skip.filter(d => typeof d === 'string') : []
+  };
+}
 
 /* ---------- recurrence ---------- */
 function occursOn(t, day) {
@@ -145,6 +170,7 @@ function renderDrawer() {
       <label class="set-row"><span>24-hour clock</span><input type="checkbox" data-set="h24" ${s.h24 ? 'checked' : ''}></label>
       <label class="set-row"><span>Week starts Monday</span><input type="checkbox" data-set="mon" ${s.mon ? 'checked' : ''}></label>
       <p class="hint">Last backup: ${s.lastBackup || S.lastBackup ? esc(longDate(S.lastBackup)) : 'never — tap Export to save one'}</p>
+      <p class="hint ver">Daybloom ${VERSION} · data stays on this device</p>
       <div class="btn-row">
         <button data-act="notif">🔔 Notifications</button>
         ${LN() ? '' : '<button data-act="install">📲 Install app</button>'}
@@ -223,6 +249,12 @@ function renderDay() {
   }
   let hours = '';
   for (let hr = 0; hr < 24; hr++) hours += `<div class="hr" style="top:${hr * PPH}px"><span>${fmtHour(hr)}</span></div>`;
+  if (!items.length) {
+    // nothing planned: a short empty state instead of 24 empty hour rows
+    $('#view').innerHTML = h + `<div class="empty-day"><span class="ed-ic">🌱</span><b>Nothing planned</b><p>No tasks on ${esc(longDate(cur))}. Add one to start shaping the day.</p><button class="primary" data-act="add">+ Add a task</button></div>`;
+    stage();
+    return;
+  }
   h += `<div class="timeline" id="grid">${hours}${layout(timed)}${cur === todayStr() ? '<div class="now" id="nowLine"></div>' : ''}</div>`;
   $('#view').innerHTML = h;
   stage();
@@ -475,10 +507,26 @@ document.addEventListener('change', e => {
   S.settings[k] = e.target.type === 'checkbox' ? e.target.checked : e.target.value; save(); render();
 });
 $('#importFile').onchange = e => {
-  const f = e.target.files[0]; if (!f) return;
+  const f = e.target.files && e.target.files[0]; if (!f) return;
   const r = new FileReader();
-  r.onload = () => { try { const x = JSON.parse(r.result); if (!Array.isArray(x.tasks)) throw 0; S = Object.assign({ settings: S.settings, focus: {}, fired: {}, templates: [] }, x); S.templates = S.templates || []; S.focus = S.focus || {}; S.fired = S.fired || {}; save(); render(); toast('Backup imported'); } catch (err) { toast('Invalid backup file'); } };
-  r.readAsText(f); e.target.value = '';
+  r.onload = () => {
+    e.target.value = '';
+    let x;
+    try { x = JSON.parse(String(r.result).replace(/^\uFEFF/, '')); } catch (err) { toast('That file is not valid JSON'); return; }
+    if (!x || !Array.isArray(x.tasks)) { toast('That file is not a Daybloom backup'); return; }
+    S = {
+      tasks: x.tasks.map(normalizeTask),
+      settings: Object.assign({ theme: 'system', accent: '#5f7cff', h24: false, mon: true }, S.settings, x.settings && typeof x.settings === 'object' ? x.settings : {}),
+      templates: Array.isArray(x.templates) ? x.templates : [],
+      focus: x.focus && typeof x.focus === 'object' ? x.focus : {},
+      fired: {},
+      lastBackup: x.lastBackup
+    };
+    save(); closeDrawer(); render(); buzz(20);
+    toast(`Imported ${S.tasks.length} task${S.tasks.length === 1 ? '' : 's'} ✅`);
+  };
+  r.onerror = () => { e.target.value = ''; toast('Could not read that file'); };
+  r.readAsText(f);
 };
 const canDismiss = el => Date.now() - (el._at || 0) > 500; // ignore the ghost mouse event that follows a tap
 $('#modal').addEventListener('mousedown', e => { if (e.target.id === 'modal' && canDismiss(e.target)) closeModal(); });
@@ -517,15 +565,17 @@ viewEl.addEventListener('pointerdown', e => {
   const y0 = e.clientY, top0 = parseFloat(blk.style.top), h0 = parseFloat(blk.style.height);
   let moved = false;
   try { blk.setPointerCapture(e.pointerId); } catch (err) {}
-  let lastM = -1;
+  let lastM = -1, curTop = top0;
   const mv = ev => {
     if (!canDrag) return;
     const dy = ev.clientY - y0;
-    if (!moved && Math.abs(dy) > 4) { moved = true; blk.classList.add('lift'); buzz(10); }
+    if (!moved && Math.abs(dy) > 4) { moved = true; blk.classList.add('lift'); blk.style.transition = 'none'; buzz(10); }
     if (!moved) return;
     if (mode === 'move') {
-      const top = Math.max(0, Math.min(24 * PPH - h0, top0 + dy)); blk.style.top = top + 'px';
-      const mm = snap(top / PPM); if (mm !== lastM) { lastM = mm; buzz(4); }
+      // translate instead of top: the block moves on the compositor, no layout or paint per frame
+      curTop = Math.max(0, Math.min(24 * PPH - h0, top0 + dy));
+      blk.style.transform = `translateY(${curTop - top0}px) scale(1.03)`;
+      const mm = snap(curTop / PPM); if (mm !== lastM) { lastM = mm; buzz(4); }
       blk.style.setProperty('--tip', `"${fmt(fromMin(Math.min(mm, 24 * 60 - 15)))}"`);
     } else {
       const hh = Math.max(15 * PPM, h0 + dy); blk.style.height = hh + 'px';
@@ -533,15 +583,17 @@ viewEl.addEventListener('pointerdown', e => {
       blk.style.setProperty('--tip', `"${fmtDur(mm)}"`);
     }
   };
-  const end = () => { blk.removeEventListener('pointermove', mv); blk.removeEventListener('pointerup', up); blk.removeEventListener('pointercancel', end); };
+  const end = () => { blk.removeEventListener('pointermove', mv); blk.removeEventListener('pointerup', up); blk.removeEventListener('pointercancel', cancel); };
+  // interrupted drag (pointercancel, e.g. the phone starts scrolling): put the block back where it was
+  const cancel = () => { end(); if (moved) { blk.style.transform = ''; blk.style.transition = ''; blk.style.height = h0 + 'px'; blk.classList.remove('lift'); } };
   const up = () => {
     end();
     if (!moved) { openEditor(id); return; } // a tap anywhere on the block (even the resize edge) opens it
-    if (mode === 'move') t.time = fromMin(Math.min(snap(parseFloat(blk.style.top) / PPM), 24 * 60 - 15));
+    if (mode === 'move') t.time = fromMin(Math.min(snap(curTop / PPM), 24 * 60 - 15));
     else t.dur = Math.max(15, snap((parseFloat(blk.style.height) + 2) / PPM));
     save(); render();
   };
-  blk.addEventListener('pointermove', mv); blk.addEventListener('pointerup', up); blk.addEventListener('pointercancel', end);
+  blk.addEventListener('pointermove', mv); blk.addEventListener('pointerup', up); blk.addEventListener('pointercancel', cancel);
 });
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (S.settings.theme === 'system') applyTheme(); });
 

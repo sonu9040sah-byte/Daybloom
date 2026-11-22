@@ -33,7 +33,7 @@ h1{margin:0;font-size:30px;letter-spacing:-.03em;font-weight:800}
 .wide{width:100%;margin-top:12px}
 
 #progress{height:5px;margin:4px 20px 10px;background:var(--line);border-radius:3px;overflow:hidden}
-#progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),color-mix(in srgb,var(--accent) 60%,#fff));border-radius:3px;transition:width .7s var(--ease)}
+#progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),color-mix(in srgb,var(--accent) 60%,#fff));border-radius:3px;transition:width .5s var(--ease)}
 
 /* week strip */
 #weekStrip{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;padding:0 14px 10px}
@@ -47,16 +47,16 @@ h1{margin:0;font-size:30px;letter-spacing:-.03em;font-weight:800}
 .wd.sel small{color:rgba(255,255,255,.8)}
 .wd.sel .ring{background:conic-gradient(#fff var(--p,0deg),rgba(255,255,255,.3) 0)}
 .wd.sel .ring span{background:var(--accent)}
-#weekStrip.anim .ring{animation:ringgrow .9s var(--ease) both}
+#weekStrip.anim .ring{animation:ringgrow .6s var(--ease) both}
 #weekStrip.anim .wd{animation:popIn .45s var(--spring) both}
 #weekStrip.anim .wd:nth-child(2){animation-delay:.03s}#weekStrip.anim .wd:nth-child(3){animation-delay:.06s}#weekStrip.anim .wd:nth-child(4){animation-delay:.09s}
 #weekStrip.anim .wd:nth-child(5){animation-delay:.12s}#weekStrip.anim .wd:nth-child(6){animation-delay:.15s}#weekStrip.anim .wd:nth-child(7){animation-delay:.18s}
 
 #view{flex:1;overflow-y:auto;overflow-x:hidden;padding:4px 16px 170px;position:relative;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 #view::-webkit-scrollbar{display:none}
-#view.slide-l>*{animation:inL .42s var(--ease) both}
-#view.slide-r>*{animation:inR .42s var(--ease) both}
-#view.fade>*{animation:fadeUp .4s var(--ease) both}
+#view.slide-l>*{animation:inL .3s var(--ease) both}
+#view.slide-r>*{animation:inR .3s var(--ease) both}
+#view.fade>*{animation:fadeUp .3s var(--ease) both}
 
 /* tray + rows */
 .tray{background:var(--panel);border-radius:var(--radius);padding:12px 12px 6px;margin-bottom:14px;box-shadow:var(--shadow)}
@@ -66,7 +66,7 @@ h1{margin:0;font-size:30px;letter-spacing:-.03em;font-weight:800}
 .row .ic{font-size:20px}
 .row .t{flex:1;font-weight:600}
 .row.done .t{text-decoration:line-through;color:var(--muted)}
-.anim .row{animation:rowIn .45s var(--ease) both;animation-delay:calc(var(--i,0)*45ms)}
+.anim .row{animation:rowIn .34s var(--ease) both;animation-delay:calc(min(var(--i,0),3)*40ms)}
 
 .chk{width:28px;height:28px;border-radius:50%;border:2.5px solid var(--c,var(--accent));flex:none;display:grid;place-items:center;background:transparent;transition:background .22s,transform .2s var(--spring)}
 .chk::after{content:"✓";color:#fff;font-size:15px;font-weight:800;transform:scale(0);transition:transform .3s var(--spring)}
@@ -89,11 +89,11 @@ h1{margin:0;font-size:30px;letter-spacing:-.03em;font-weight:800}
 .blk .grip{position:absolute;right:4px;top:4px;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-size:18px;color:var(--muted);touch-action:none;background:color-mix(in srgb,var(--c) 18%,transparent)}
 .blk .rs{position:absolute;left:0;right:0;bottom:0;height:20px;touch-action:none}
 .blk .rs::after{content:"";position:absolute;left:50%;bottom:4px;width:28px;height:4px;border-radius:2px;margin-left:-14px;background:var(--c);opacity:.5}
-.blk.lift{transform:scale(1.03);box-shadow:0 14px 34px rgba(0,0,0,.28);z-index:10;transition:transform .15s var(--spring)}
+.blk.lift{transform:scale(1.03);box-shadow:0 14px 34px rgba(0,0,0,.28);z-index:10;will-change:transform}
 .blk.lift::after{content:var(--tip);position:absolute;right:44px;top:6px;background:var(--text);color:var(--bg);font-size:11px;font-weight:700;padding:3px 8px;border-radius:8px}
-.anim .blk{animation:blockIn .5s var(--spring) both;animation-delay:calc(var(--i,0)*55ms)}
+.anim .blk{animation:blockIn .38s var(--spring) both;animation-delay:calc(min(var(--i,0),3)*40ms)}
 .now{position:absolute;left:-8px;right:0;height:2px;background:#ff4757;z-index:5;pointer-events:none}
-.now::before{content:"";position:absolute;left:0;top:-4px;width:10px;height:10px;border-radius:50%;background:#ff4757;animation:pulse 2s infinite}
+.now::before{content:"";position:absolute;left:0;top:-4px;width:10px;height:10px;border-radius:50%;background:#ff4757;box-shadow:0 0 0 2px rgba(255,71,87,.35);animation:pulse 2s infinite}
 
 /* month */
 .mnav{display:flex;align-items:center;justify-content:space-between;margin:0 0 12px}
@@ -109,7 +109,7 @@ h1{margin:0;font-size:30px;letter-spacing:-.03em;font-weight:800}
 .dots{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px}
 .dots i{width:7px;height:7px;border-radius:50%;background:var(--c)}
 .dots i.done{opacity:.35}
-.anim .mc{animation:popIn .4s var(--spring) both;animation-delay:calc(var(--i,0)*10ms)}
+.anim .mc{animation:popIn .3s var(--spring) both;animation-delay:calc(min(var(--i,0),6)*10ms)}
 
 /* insights */
 .cards{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
@@ -122,11 +122,11 @@ h1{margin:0;font-size:30px;letter-spacing:-.03em;font-weight:800}
 .bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:6px;font-size:11px;color:var(--muted)}
 .bar i{display:block;width:100%;max-width:34px;border-radius:9px 9px 5px 5px;background:var(--line);position:relative;overflow:hidden}
 .bar i em{position:absolute;left:0;right:0;bottom:0;background:var(--accent);transform-origin:bottom}
-.anim .bar i{animation:growY .8s var(--ease) both;transform-origin:bottom}
-.anim .bar i em{animation:growY .9s .25s var(--ease) both}
+.anim .bar i{animation:growY .55s var(--ease) both;transform-origin:bottom}
+.anim .bar i em{animation:growY .6s .1s var(--ease) both}
 
 /* nav */
-#tabbar{position:absolute;left:0;right:0;bottom:0;z-index:30;display:grid;grid-template-columns:repeat(4,1fr);background:color-mix(in srgb,var(--panel) 88%,transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:1px solid var(--line);padding:7px 6px calc(7px + var(--sb))}
+#tabbar{position:absolute;left:0;right:0;bottom:0;z-index:30;display:grid;grid-template-columns:repeat(4,1fr);background:color-mix(in srgb,var(--panel) 97%,transparent);border-top:1px solid var(--line);padding:7px 6px calc(7px + var(--sb))}
 #tabbar button{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;font-weight:700;color:var(--muted);padding:4px;transition:color .25s}
 #tabbar button span{font-size:21px;transition:transform .35s var(--spring);filter:grayscale(1);opacity:.7}
 #tabbar button.active{color:var(--accent)}
@@ -145,6 +145,11 @@ h1{margin:0;font-size:30px;letter-spacing:-.03em;font-weight:800}
 .grab::before{content:"";position:absolute;inset:-14px -40px}
 .card h2{margin:0 0 12px;font-size:22px}
 .hint{margin:-4px 0 12px;color:var(--muted);font-size:13px}
+.hint.ver{opacity:.7;font-size:12px;margin-top:-6px}
+.empty-day{background:var(--panel);border-radius:var(--radius);box-shadow:var(--shadow);padding:34px 22px;margin-top:6px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px}
+.empty-day .ed-ic{font-size:34px;line-height:1}
+.empty-day b{font-size:17px}
+.empty-day p{margin:0 0 6px;max-width:270px;color:var(--muted);font-size:13px;line-height:1.5}
 .field{margin-bottom:12px}
 .field label{display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.06em}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -207,7 +212,7 @@ h1{margin:0;font-size:30px;letter-spacing:-.03em;font-weight:800}
 @keyframes ringgrow{from{--p:0deg}}
 @keyframes growY{from{transform:scaleY(0)}}
 @keyframes fabIn{from{opacity:0;transform:scale(.3) rotate(-90deg)}}
-@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,71,87,.5)}50%{box-shadow:0 0 0 6px rgba(255,71,87,0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
 @keyframes conf{to{transform:translate(var(--dx),var(--dy)) rotate(260deg);opacity:0}}
 
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;animation-delay:0s!important;transition-duration:.01ms!important}}
