@@ -3,8 +3,9 @@
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const KEY = 'daybloom.v1';
-const VERSION = '1.3.0';
+const VERSION = '1.4.0';
 const PPH = 64, PPM = PPH / 60;
+const SHORT_H = 40; // shorter blocks get the one-line layout + a compact start time
 const COLORS = ['#ff6b6b','#ff9f43','#feca57','#1dd1a1','#48dbfb','#5f7cff','#a55eea','#ff78b5','#8395a7'];
 const ICONS = ['📝','💼','🏃','📚','🍽️','🛒','🧘','💡','📞','✈️','🎯','🛌','💻','🎵','🧹','💊'];
 const REPEATS = [['none','Does not repeat'],['daily','Every day'],['weekdays','Weekdays'],['weekly','Every week'],['monthly','Every month']];
@@ -54,7 +55,7 @@ let S = load();
 let nativeT;
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} clearTimeout(nativeT); nativeT = setTimeout(scheduleNative, 800); };
 let view = 'day', cur = todayStr(), monthCur = cur.slice(0, 8) + '01', needScroll = true;
-let animate = true, navDir = 0, drawerMode = null, deferredInstall = null;
+let animate = true, navDir = 0, drawerMode = null, deferredInstall = null, searchQ = '';
 const byId = id => S.tasks.find(t => t.id === id);
 
 /* ---------- imported data ---------- */
@@ -113,6 +114,8 @@ const fmtDur = m => m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? ' ' + (m % 60) +
 // compact clock for 30-minute blocks, where "7:00 AM" is too wide to share a line with the title
 const shortTime = t => { if (!t) return ''; if (S.settings.h24) return t; const [h, m] = t.split(':').map(Number); return `${h % 12 || 12}:${pad(m)}`; };
 const longDate = s => parse(s).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+// stored dates can be missing or hand-edited, and parse() throws on anything that isn't YYYY-MM-DD
+const longDateSafe = s => /^\d{4}-\d{2}-\d{2}$/.test(String(s || '')) ? longDate(s) : '';
 
 /* ---------- theme ---------- */
 function applyTheme() {
@@ -154,7 +157,9 @@ function renderDrawer() {
   if (!drawerMode) return;
   let h = '<div class="grab"></div>';
   const head = title => `<div class="sheet-head"><h2>${title}</h2><button class="sheet-x" data-act="closeDrawer" aria-label="Close">✕</button></div>`;
-  if (drawerMode === 'inbox') {
+  if (drawerMode === 'search') {
+    h += head('Search') + `<div class="searchbox"><input id="searchInput" type="search" placeholder="Find a task, note or subtask" value="${esc(searchQ)}" autocomplete="off"></div><div id="searchResults"></div>`;
+  } else if (drawerMode === 'inbox') {
     const inbox = S.tasks.filter(t => !t.date);
     h += head('Inbox') + `<p class="hint">Ideas and to-dos without a date. Tap the calendar button to put one on ${esc(longDate(cur))}.</p>
       <ul id="inboxList">${inbox.length ? inbox.map((t, k) => `
@@ -179,6 +184,8 @@ function renderDrawer() {
       <div class="set-group">
         <button class="set-link" data-act="export">Export backup</button>
         <button class="set-link" data-act="import">Import backup</button>
+        <button class="set-link" data-act="autoBackup">Back up now</button>
+        ${S.autoBackupAt ? '<button class="set-link" data-act="restoreAuto">Restore automatic backup</button>' : ''}
         <button class="set-link danger" data-act="reset">Reset to sample data</button>
       </div>
       <p class="sec-label">Device</p>
@@ -186,10 +193,25 @@ function renderDrawer() {
         <button class="set-link" data-act="notif">Notifications</button>
         ${LN() ? '' : '<button class="set-link" data-act="install">Install app</button>'}
       </div>
-      <p class="hint" style="margin-top:14px">Last backup: ${s.lastBackup || S.lastBackup ? esc(longDate(S.lastBackup)) : 'never — export one to keep your data safe'}</p>
+      <p class="hint" style="margin-top:14px">${S.lastBackup ? 'Last export: ' + esc(longDateSafe(S.lastBackup)) : 'No export yet — worth keeping one off the device'}<br>${S.autoBackupAt ? 'Automatic backup: ' + esc(longDateSafe(S.autoBackupAt)) : 'Automatic backup: runs weekly when you open the app'}</p>
       <p class="hint ver">Daybloom ${VERSION} · data stays on this device</p>`;
   }
   $('#drawerCard').innerHTML = h;
+  if (drawerMode === 'search') drawSearch();
+}
+function drawSearch() {
+  const box = $('#searchResults'); if (!box) return;
+  const q = searchQ.trim().toLowerCase();
+  const haystack = t => [t.title, t.notes || '', ...(t.subtasks || []).map(s => s.t)].join(' ').toLowerCase();
+  const list = (q ? S.tasks.filter(t => haystack(t).includes(q)) : S.tasks.slice())
+    .sort((a, b) => (a.date || '9999') === (b.date || '9999') ? (a.time || '').localeCompare(b.time || '') : (a.date || '9999').localeCompare(b.date || '9999'));
+  box.innerHTML = list.length
+    ? `<ul class="results">${list.slice(0, 40).map((t, k) => `
+        <li class="res ${t.done && t.done.inbox ? 'done' : ''}" style="--i:${k};--c:${t.color}" data-act="openTask" data-id="${t.id}">
+          <span class="ic">${esc(t.icon)}</span>
+          <span class="t">${esc(t.title)}<em class="meta">${t.date ? esc(longDateSafe(t.date)) + (t.time ? ' · ' + fmt(t.time) : '') : 'Inbox · no date'}</em></span>
+        </li>`).join('')}</ul>`
+    : `<div class="empty">No task matches “${esc(searchQ.trim())}”.</div>`;
 }
 function renderHeader() {
   const title = $('#title'), sub = $('#subtitle'), today = todayStr();
@@ -231,11 +253,12 @@ function blockHTML(i, lane, lanes, n) {
   const note = t.notes && t.notes.trim() ? ' · 📝' : '';
   const w = 100 / lanes;
   const hpx = Math.max(dur * PPM, 34) - 2;
-  // only the shortest blocks use one-line layout; they get a compact start time
-  const when = hpx < 40
+  // one threshold drives both the layout class and the time format, so they can't disagree
+  const compact = hpx < SHORT_H;
+  const when = compact
     ? shortTime(t.time)
     : `${fmt(t.time)} – ${fmt(fromMin(start + dur))} · ${fmtDur(dur)}${subs}${note}${t.repeat !== 'none' ? ' · 🔁' : ''}`;
-  return `<div class="blk ${i.done ? 'done' : ''} ${hpx < 56 ? 'short' : ''}" data-id="${t.id}" style="--i:${n};--c:${t.color};top:${start * PPM}px;height:${hpx}px;left:calc(${lane * w}% + 6px);width:calc(${w}% - 12px)">
+  return `<div class="blk ${i.done ? 'done' : ''} ${compact ? 'short' : ''}" data-id="${t.id}" style="--i:${n};--c:${t.color};top:${start * PPM}px;height:${hpx}px;left:calc(${lane * w}% + 6px);width:calc(${w}% - 12px)">
     <button class="chk ${i.done ? 'done' : ''}" data-act="toggle" data-id="${t.id}" data-day="${i.day}" aria-label="Complete"></button>
     <div class="bt"><b>${esc(t.icon)} ${esc(t.title)}</b><small>${when}</small>${sn ? `<i class="sp" style="--v:${sd / sn * 100}%"></i>` : ''}</div>
     <div class="grip" aria-label="Drag to move">⠿</div><div class="rs"></div></div>`;
@@ -416,12 +439,12 @@ function openEditor(id, pre) {
   };
   if (!isNew) {
     $('#eDel', card).onclick = () => {
-      const orig = byId(t.id);
+      const orig = byId(t.id), snap = stateSnapshot();
       if (orig.repeat !== 'none' && orig.date) {
         if (confirm('Delete the whole series?\nOK = all repeats, Cancel = only ' + cur)) S.tasks = S.tasks.filter(x => x.id !== t.id);
         else { orig.skip = (orig.skip || []).concat(cur); }
       } else S.tasks = S.tasks.filter(x => x.id !== t.id);
-      save(); closeModal(); render(); toast('Task deleted');
+      save(); closeModal(); render(); offerUndo('Task deleted', snap);
     };
     $('#eDup', card).onclick = () => { const c = JSON.parse(JSON.stringify(byId(t.id))); c.id = uid(); c.title += ' (copy)'; c.done = {}; S.tasks.push(c); save(); closeModal(); render(); toast('Duplicated'); };
     $('#eFocus', card).onclick = () => { closeModal(); openFocus(t.id); };
@@ -433,38 +456,105 @@ function openEditor(id, pre) {
 function closeModal() { hideSheet($('#modal')); }
 
 /* ---------- focus timer ---------- */
-let F = { id: null, total: 25 * 60, remain: 25 * 60, iv: null };
-function drawFocus() { $('#fRing').style.setProperty('--fp', ((1 - F.remain / F.total) * 360) + 'deg'); $('#fTime').textContent = `${pad(Math.floor(F.remain / 60))}:${pad(F.remain % 60)}`; $('#fStart').textContent = F.iv ? 'Pause' : 'Start'; }
+// Time is derived from a wall-clock deadline, not from counting intervals, so backgrounding
+// the app (where timers are throttled or killed) no longer pauses or loses the session.
+let F = { id: null, total: 25 * 60, remain: 25 * 60, iv: null, running: false, endsAt: 0, day: todayStr() };
+function drawFocus() {
+  $('#fRing').style.setProperty('--fp', ((1 - F.remain / F.total) * 360) + 'deg');
+  $('#fTime').textContent = `${pad(Math.floor(F.remain / 60))}:${pad(F.remain % 60)}`;
+  $('#fStart').textContent = F.running ? 'Pause' : 'Start';
+}
+function logFocus(sec, day = todayStr()) { if (sec < 60) return; S.focus[day] = (S.focus[day] || 0) + Math.round(sec / 60); save(); }
+function clearTick() { clearInterval(F.iv); F.iv = null; }
+function leftSeconds() { return F.running ? Math.max(0, Math.round((F.endsAt - Date.now()) / 1000)) : F.remain; }
+function persistFocus() {
+  if (F.total && (F.running || (F.remain > 0 && F.remain < F.total))) {
+    S.focusSession = { id: F.id, total: F.total, remain: F.remain, endsAt: F.running ? F.endsAt : 0, day: F.day };
+  } else delete S.focusSession;
+  save();
+}
+function tickFocus() {
+  if (!F.running) return;
+  const left = leftSeconds();
+  if (left !== F.remain) { F.remain = left; drawFocus(); }
+  if (left <= 0) finishFocus();
+}
+function startFocusTimer() {
+  if (F.remain <= 0) F.remain = F.total;
+  F.running = true; F.endsAt = Date.now() + F.remain * 1000;
+  clearTick(); F.iv = setInterval(tickFocus, 250);
+  drawFocus(); persistFocus();
+}
+function pauseFocusTimer() {
+  if (!F.running) return;
+  F.remain = leftSeconds(); F.running = false; clearTick();
+  drawFocus(); persistFocus();
+}
+function finishFocus() {
+  clearTick(); F.running = false; F.remain = 0;
+  logFocus(F.total, F.day);
+  delete S.focusSession; save();
+  drawFocus();
+  notify('Focus complete 🎉', 'Time for a break.');
+  if (view === 'insights') render();
+}
 function openFocus(id) {
-  F.id = id; stopFocus(); F.total = F.remain = 25 * 60;
+  const s = S.focusSession;
+  F.id = id; clearTick(); F.running = false;
+  if (s && s.total) {
+    F.total = s.total; F.day = s.day || todayStr();
+    F.remain = s.endsAt ? Math.max(0, Math.round((s.endsAt - Date.now()) / 1000)) : s.remain;
+    if (F.remain <= 0) { F.remain = 0; logFocus(s.total, F.day); delete S.focusSession; save(); }
+    else if (s.endsAt) { F.running = true; F.endsAt = s.endsAt; F.iv = setInterval(tickFocus, 250); }
+  } else { F.total = F.remain = 25 * 60; F.day = todayStr(); }
   $('#fTitle').textContent = byId(id) ? `${byId(id).icon} ${byId(id).title}` : 'Focus';
-  $$('.fpresets button').forEach(b => b.classList.toggle('on', b.dataset.f === '25'));
+  $$('.fpresets button').forEach(b => b.classList.toggle('on', +b.dataset.f === Math.round(F.total / 60)));
   drawFocus(); showSheet($('#focus'));
 }
-function stopFocus() { clearInterval(F.iv); F.iv = null; }
-function logFocus(sec) { const d = todayStr(); S.focus[d] = (S.focus[d] || 0) + Math.round(sec / 60); save(); }
-$('#fStart').onclick = () => {
-  if (F.iv) { stopFocus(); drawFocus(); return; }
-  F.iv = setInterval(() => {
-    F.remain--; drawFocus();
-    if (F.remain <= 0) { stopFocus(); logFocus(F.total); notify('Focus complete 🎉', 'Time for a break.'); drawFocus(); if (view === 'insights') render(); }
-  }, 1000);
+function restoreFocusSession() {
+  const s = S.focusSession; if (!s || !s.total) return;
+  F.id = s.id; F.total = s.total; F.day = s.day || todayStr();
+  if (s.endsAt) {
+    const left = Math.round((s.endsAt - Date.now()) / 1000);
+    if (left > 0) { F.remain = left; F.running = true; F.endsAt = s.endsAt; F.iv = setInterval(tickFocus, 250); }
+    else { F.remain = 0; logFocus(s.total, F.day); delete S.focusSession; save(); }
+  } else F.remain = s.remain;
   drawFocus();
-};
-$('#fReset').onclick = () => { stopFocus(); F.remain = F.total; drawFocus(); };
+}
+$('#fStart').onclick = () => { F.running ? pauseFocusTimer() : startFocusTimer(); };
+$('#fReset').onclick = () => { clearTick(); F.running = false; F.remain = F.total; delete S.focusSession; save(); drawFocus(); };
 $('#fClose').onclick = () => {
-  const spent = F.total - F.remain;
-  if (F.iv || (spent > 0 && F.remain > 0)) { stopFocus(); if (spent >= 60) logFocus(spent); }
+  // a running timer keeps going in the background; a paused one logs what was actually spent
+  if (F.running) persistFocus();
+  else { const spent = F.total - F.remain; if (spent >= 60 && F.remain > 0) logFocus(spent, F.day); delete S.focusSession; save(); }
   hideSheet($('#focus'));
 };
 $$('.fpresets button').forEach(b => b.onclick = () => {
-  stopFocus(); F.total = F.remain = +b.dataset.f * 60;
+  clearTick(); F.running = false; F.total = F.remain = +b.dataset.f * 60; F.day = F.day || todayStr(); delete S.focusSession; save();
   $$('.fpresets button').forEach(x => x.classList.toggle('on', x === b)); drawFocus();
 });
 
 /* ---------- toast + notifications ---------- */
 let toastT;
-function toast(msg) { const el = $('#toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), 3500); }
+// a toast can carry an Undo button, which is the safety net for destructive actions
+function toast(msg, undo) {
+  const el = $('#toast');
+  el.textContent = msg;
+  if (undo) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'undo'; b.textContent = 'Undo';
+    b.onclick = () => { clearTimeout(toastT); el.classList.remove('show'); undo(); };
+    el.appendChild(b);
+  }
+  el.classList.toggle('act', !!undo);
+  el.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), undo ? 6000 : 3500);
+}
+const stateSnapshot = () => JSON.stringify(S);
+// call with a snapshot taken BEFORE the change: restoring it also reverts side effects
+function offerUndo(msg, snap) {
+  toast(msg, () => { try { S = JSON.parse(snap); } catch (e) { return; } save(); render(); });
+}
 function notify(title, body) {
   toast(`${title}${body ? ' — ' + body : ''}`);
   try { if ('Notification' in window && Notification.permission === 'granted') new Notification(title, { body }); } catch (e) {}
@@ -513,6 +603,14 @@ document.addEventListener('click', e => {
     case 'next': shift(1); break;
     case 'today': navDir = todayStr() > cur ? 1 : -1; cur = todayStr(); monthCur = cur.slice(0, 8) + '01'; needScroll = true; animate = true; buzz(6); render(); break;
     case 'menu': openDrawer('inbox'); break;
+    case 'search': searchQ = ''; openDrawer('search'); setTimeout(() => { const i = $('#searchInput'); if (i) i.focus(); }, 320); break;
+    case 'openTask': {
+      const t = byId(id); if (!t) break;
+      closeDrawer(); cur = t.date || todayStr(); monthCur = cur.slice(0, 8) + '01';
+      view = 'day'; needScroll = true; animate = true; render(); openEditor(id); break;
+    }
+    case 'autoBackup': autoBackup(true); break;
+    case 'restoreAuto': restoreAutoBackup(); break;
     case 'settings': openDrawer('settings'); break;
     case 'install': if (deferredInstall) { deferredInstall.prompt(); deferredInstall = null; } else toast('In Chrome: menu ⋮ → Install app (needs https hosting)'); break;
     case 'accent': S.settings.accent = el.dataset.c; save(); render(); break;
@@ -523,8 +621,16 @@ document.addEventListener('click', e => {
       break;
     case 'export': exportBackup(); break;
     case 'import': $('#importFile').click(); break;
-    case 'reset': if (confirm('Reset everything to the sample data? This deletes all your tasks.')) { S = { tasks: sample(), settings: S.settings, templates: S.templates || [], lastBackup: S.lastBackup, focus: {}, fired: {} }; save(); render(); } break;
+    case 'reset': {
+      const snap = stateSnapshot();
+      S = { tasks: sample(), settings: S.settings, templates: S.templates || [], lastBackup: S.lastBackup, autoBackupAt: S.autoBackupAt, focus: {}, fired: {} };
+      save(); render(); offerUndo('Reset to sample data', snap); break;
+    }
   }
+});
+document.addEventListener('input', e => {
+  if (e.target.id !== 'searchInput') return;
+  searchQ = e.target.value; drawSearch();
 });
 document.addEventListener('change', e => {
   const k = e.target.dataset && e.target.dataset.set; if (!k) return;
@@ -538,15 +644,7 @@ $('#importFile').onchange = e => {
     let x;
     try { x = JSON.parse(String(r.result).replace(/^\uFEFF/, '')); } catch (err) { toast('That file is not valid JSON'); return; }
     if (!x || !Array.isArray(x.tasks)) { toast('That file is not a Daybloom backup'); return; }
-    S = {
-      tasks: x.tasks.map(normalizeTask),
-      settings: Object.assign({ theme: 'system', accent: '#5f7cff', h24: false, mon: true }, S.settings, x.settings && typeof x.settings === 'object' ? x.settings : {}),
-      templates: Array.isArray(x.templates) ? x.templates : [],
-      focus: x.focus && typeof x.focus === 'object' ? x.focus : {},
-      fired: {},
-      lastBackup: x.lastBackup
-    };
-    save(); closeDrawer(); render(); buzz(20);
+    applyImport(x);
     toast(`Imported ${S.tasks.length} task${S.tasks.length === 1 ? '' : 's'} ✅`);
   };
   r.onerror = () => { e.target.value = ''; toast('Could not read that file'); };
@@ -646,6 +744,46 @@ async function exportBackup() {
     if (!/cancel/i.test(String((e && e.message) || e))) toast('Backup failed. Try again.');
   }
 }
+/* ---------- automatic backups ---------- */
+// One rolling backup, refreshed weekly on launch, so cleared data or a lost phone still has
+// a recent copy. Native writes a file to Documents; the browser keeps a second localStorage key.
+const AUTO_FILE = 'daybloom-auto-backup.json', AUTO_KEY = 'daybloom.autobackup';
+async function autoBackup(manual) {
+  const json = JSON.stringify(S), fsP = plug('Filesystem');
+  let ok = false;
+  if (fsP) { try { await fsP.writeFile({ path: AUTO_FILE, data: json, directory: 'DOCUMENTS', encoding: 'utf8', recursive: true }); ok = true; } catch (e) {} }
+  if (!ok) { try { localStorage.setItem(AUTO_KEY, json); ok = true; } catch (e) {} }
+  if (ok) {
+    S.autoBackupAt = todayStr(); save();
+    if (drawerMode === 'settings') renderDrawer();
+    if (manual) toast('Backup saved ✅');
+  } else if (manual) toast('Could not save a backup on this device');
+}
+const autoBackupDue = () => !S.autoBackupAt || S.autoBackupAt < addDays(todayStr(), -7);
+function applyImport(x) {
+  S = {
+    tasks: x.tasks.map(normalizeTask),
+    settings: Object.assign({ theme: 'system', accent: '#5f7cff', h24: false, mon: true }, S.settings, x.settings && typeof x.settings === 'object' ? x.settings : {}),
+    templates: Array.isArray(x.templates) ? x.templates : [],
+    focus: x.focus && typeof x.focus === 'object' ? x.focus : {},
+    fired: {},
+    lastBackup: x.lastBackup,
+    autoBackupAt: x.autoBackupAt
+  };
+  save(); closeDrawer(); render(); buzz(20);
+}
+async function restoreAutoBackup() {
+  const fsP = plug('Filesystem');
+  let raw = null;
+  if (fsP) { try { const r = await fsP.readFile({ path: AUTO_FILE, directory: 'DOCUMENTS', encoding: 'utf8' }); raw = typeof r.data === 'string' ? r.data : null; } catch (e) {} }
+  if (!raw) { try { raw = localStorage.getItem(AUTO_KEY); } catch (e) {} }
+  if (!raw) { toast('No automatic backup on this device yet'); return; }
+  let x; try { x = JSON.parse(raw); } catch (e) { toast('That backup is not readable'); return; }
+  if (!x || !Array.isArray(x.tasks)) { toast('That backup is not readable'); return; }
+  const snap = stateSnapshot();
+  applyImport(x);
+  offerUndo(`Restored ${x.tasks.length} task${x.tasks.length === 1 ? '' : 's'}`, snap);
+}
 function hashId(str) { let h = 7; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0; return Math.abs(h) % 2147483000 + 1; }
 const CHANNEL = { id: 'reminders', name: 'Task reminders', description: 'Reminders before your tasks start', importance: 4, visibility: 1, vibration: true };
 async function scheduleNative() {
@@ -715,6 +853,8 @@ window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferr
 
 render();
 tick();
+restoreFocusSession();
+if (autoBackupDue()) setTimeout(() => autoBackup(false), 2000);
 if (LN()) { LN().createChannel(CHANNEL).catch(() => {}); scheduleNative(); }
 
 /* Android back button: close the top sheet, then go back to Day, then to Today, then exit */
@@ -735,5 +875,10 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 /* Re-sync when the app returns to the foreground (new day, due reminders) */
-document.addEventListener('visibilitychange', () => { if (!document.hidden) { render(); tick(); scheduleNative(); } });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  tickFocus();
+  render(); tick(); scheduleNative();
+  if (autoBackupDue()) autoBackup(false);
+});
 })();

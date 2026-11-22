@@ -30,7 +30,10 @@ This is an original app inspired by timeline-style planners. It does not use any
 - Reminders (in-app toasts plus browser notifications once enabled; keep the tab open)
 - Focus / Pomodoro timer (15/25/45/50 min) that logs focus time
 - Light / dark / system theme, accent colors, 12h/24h clock, week start
-- Export / import JSON backups
+- Search across task titles, notes and subtasks
+- Export / import JSON backups, plus a rolling automatic backup refreshed weekly on launch
+- Undo for deleting tasks and for resetting the data
+- Focus timer keeps running while the app is backgrounded or closed, and logs the minutes when it finishes
 
 ## Use it on Android
 
