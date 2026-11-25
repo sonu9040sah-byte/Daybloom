@@ -6,7 +6,7 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 
 // Bump VERSION_CODE for every build you want installable over an older one.
-const VERSION_CODE = 4;
+const VERSION_CODE = 5;
 const pkg = require('../package.json');
 
 const PERMISSIONS = [

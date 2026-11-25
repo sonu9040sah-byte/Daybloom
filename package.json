@@ -1,6 +1,6 @@
 {
   "name": "daybloom",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "A free, visual daily planner with a timeline, inbox, recurring tasks, reminders, focus timer and insights.",
   "scripts": {
     "start": "node server.js",

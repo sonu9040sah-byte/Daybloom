@@ -3,7 +3,7 @@
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const KEY = 'daybloom.v1';
-const VERSION = '1.4.0';
+const VERSION = '1.4.1';
 const PPH = 64, PPM = PPH / 60;
 const SHORT_H = 40; // shorter blocks get the one-line layout + a compact start time
 const COLORS = ['#ff6b6b','#ff9f43','#feca57','#1dd1a1','#48dbfb','#5f7cff','#a55eea','#ff78b5','#8395a7'];
@@ -52,8 +52,8 @@ function load() {
   return { tasks: sample(), settings: { theme: 'system', accent: '#5f7cff', h24: false, mon: true }, templates: [], focus: {}, fired: {} };
 }
 let S = load();
-let nativeT;
-const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} clearTimeout(nativeT); nativeT = setTimeout(scheduleNative, 800); };
+let nativeT, streakMemo = null;
+const save = () => { streakMemo = null; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} clearTimeout(nativeT); nativeT = setTimeout(scheduleNative, 800); };
 let view = 'day', cur = todayStr(), monthCur = cur.slice(0, 8) + '01', needScroll = true;
 let animate = true, navDir = 0, drawerMode = null, deferredInstall = null, searchQ = '';
 const byId = id => S.tasks.find(t => t.id === id);
@@ -230,6 +230,12 @@ function renderHeader() {
   // the Insights charts run to the right edge, so the add button would sit on top of them
   $('#fab').style.display = view === 'insights' ? 'none' : '';
   $('#weekStrip').style.display = view === 'day' ? '' : 'none';
+  const st = streakStats(), chip = $('#streak');
+  if (view === 'day' && st.current > 0) {
+    chip.hidden = false;
+    chip.textContent = `🔥 ${st.current}`;
+    chip.setAttribute('aria-label', `Day streak: ${st.current} day${st.current === 1 ? '' : 's'} — open Insights`);
+  } else chip.hidden = true;
 }
 function renderStrip() {
   if (view !== 'day') return;
@@ -328,6 +334,21 @@ function renderMonth() {
   stage();
   $('#view').scrollTop = 0; // a view switch shouldn't inherit the previous view's scroll offset
 }
+// A day builds the streak when it had at least one planned task and every one was completed.
+// Empty days are neutral, so a weekend off or a day with nothing planned doesn't reset the run,
+// and today only breaks it once the day is actually over.
+function streakStats() {
+  if (streakMemo) return streakMemo;
+  const today = todayStr();
+  let current = 0;
+  for (let i = 0; i < 730; i++) {
+    const items = tasksOn(addDays(today, -i));
+    if (!items.length) continue;                 // nothing planned: neutral day
+    if (items.every(x => x.done)) current++;     // a completed day
+    else if (i > 0) break;                       // a missed day ends the run
+  }
+  return (streakMemo = { current });
+}
 function renderInsights() {
   const days = [], today = todayStr();
   for (let i = 6; i >= 0; i--) days.push(addDays(today, -i));
@@ -337,22 +358,19 @@ function renderInsights() {
     total += it.length; done += d; focus += S.focus[day] || 0;
     return { day, n: it.length, d };
   });
-  let streak = 0;
-  for (let i = 0; i <= 365; i++) {
-    const it = tasksOn(addDays(today, -i));
-    if (it.length && it.every(x => x.done)) streak++; else if (i === 0) continue; else break;
-  }
+  const streak = streakStats();
   const max = Math.max(1, ...stats.map(s => s.n));
   $('#view').innerHTML = `
     <div class="cards">
       <div class="stat"><b data-count="${total ? Math.round(done / total * 100) : 0}" data-suf="%">0%</b><span>Completion rate</span></div>
       <div class="stat"><b data-count="${done}">0</b><span>Tasks completed</span></div>
-      <div class="stat"><b data-count="${streak}">0</b><span>Day streak</span></div>
+      <div class="stat"><b data-count="${streak.current}">0</b><span>Day streak</span></div>
       <div class="stat"><b data-count="${focus}" data-suf="m">0m</b><span>Focus time</span></div>
     </div>
     <div class="bars">${stats.map(s => `<div class="bar"><span>${s.d}/${s.n}</span>
       <i style="height:${Math.max(6, s.n / max * 150)}px"><em style="height:${s.n ? s.d / s.n * 100 : 0}%"></em></i>
-      <span>${parse(s.day).toLocaleDateString(undefined, { weekday: 'short' })}</span></div>`).join('')}</div>`;
+      <span>${parse(s.day).toLocaleDateString(undefined, { weekday: 'short' })}</span></div>`).join('')}</div>
+    <p class="hint" style="margin:14px 2px 0">A day keeps your streak alive when every task planned for it is done. Days with nothing planned don’t break it.</p>`;
   stage();
   countUp();
   $('#view').scrollTop = 0;
@@ -644,8 +662,10 @@ $('#importFile').onchange = e => {
     let x;
     try { x = JSON.parse(String(r.result).replace(/^\uFEFF/, '')); } catch (err) { toast('That file is not valid JSON'); return; }
     if (!x || !Array.isArray(x.tasks)) { toast('That file is not a Daybloom backup'); return; }
+    // importing replaces the whole plan, so keep the old state for the Undo button
+    const snap = stateSnapshot();
     applyImport(x);
-    toast(`Imported ${S.tasks.length} task${S.tasks.length === 1 ? '' : 's'} ✅`);
+    offerUndo(`Imported ${S.tasks.length} task${S.tasks.length === 1 ? '' : 's'}`, snap);
   };
   r.onerror = () => { e.target.value = ''; toast('Could not read that file'); };
   r.readAsText(f);
